@@ -1,0 +1,52 @@
+/******************* 1D Linear advection of a Discontinuous Wave **************/
+/* Pure advection of a discontinuous profile with constant advection velocity */
+/******************************************************************************/
+/**
+ * 1D uniform, regular and periodic cartesian mesh.
+ * u = cst -> Saiph's generated code contains the "advec" operator
+ * which applies the method of lines, carrying no truncation error
+ * for a pure transport phenomena if and only if v*(dt/dx) = positive integer
+ * (cfl = positive integer)
+ *
+ * For u being a problem variable, the same result is obtained through the stabgrad
+ * operator (accuracy set to 1) if and only if cfl = 1.
+ *
+ * If cfl > 1, and running the application in parallel, a higher
+ * accuracy (than the default one, which is equal to 2) should be set, since
+ * in that case, the cfl indicates the number of neighbours needed to transport
+ * the profile.
+ * */
+
+/*** Simulation parameters ***/
+// Space discretization factor
+val H = 1*mm
+// Time discretization factor
+val Dt = 1*ms
+// Number of steps
+val nsteps = 2000
+
+/*** Cartesian mesh definition, through (init, end) coordinates ***/
+val mesh = CartesianMesh((-1*m, 1*m))
+// Spatial discretisation factor
+mesh.discretize(H)
+// Grid BCs
+mesh.setPeriodic(DirX)
+
+/*** Variables and constants definition ***/
+val u = Constant(m/s)("velocity", 1 * m/s)
+val phi = ProblemVariable(Unitless)("Phi", mesh, (x, y, z) => {
+  if(x >= -0.8*m && x <= -0.6*m) exp(-(ln(2*Unitless)*(pow(x.value+0.7, 2))/0.0009))
+  else if(x >= -0.4*m && x <= -0.2*m) 1 * Unitless
+  else if(x >= 0*m && x <= 0.2*m) 1 - abs(10*(x.value-0.1))
+  else if(x >= 0.4*m && x <= 0.6*m) sqrt(1 - 100 * pow(x.value-0.5, 2))
+  else 0 * Unitless
+})
+
+/*** Equation definition ***/
+val adveq = Equation(dt(phi), -u * grad(phi))
+
+/*** Problem definition ***/
+val probAdv = Problem(mesh)(adveq)
+
+/*** Stepper definition ***/
+Stepper(probAdv, Dt, nsteps, IntegrationMethod.Euler)("1DDiscontinousWave_Euler", OutputFormat.Binary, SamplingMethod.Periodic, 5)
