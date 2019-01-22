@@ -1,0 +1,73 @@
+/************** 1D Euler Equations - Lax Sod Shock Tube  *******************/
+/***************************************************************************/
+
+/**
+ * 1D uniform, regular and periodic cartesian mesh.
+ * u != cst -> Saiph's generated code contains a convective gradient operator
+ * which applies the CTU, TVD, leonard scheme O(dx^3)
+ *
+ * */
+
+/*** Simulation parameters ***/
+// Mesh size
+val XSIZE = 1*m
+// Space discretization factor
+val H = 5*mm
+// Time discretization factor
+val Dt = 1.0*ms
+// Number of steps
+val nsteps = 80
+
+/*** Cartesian mesh definition ***/
+// 1D Cartesian mesh, set through init and end coords
+val mesh = CartesianMesh(XSIZE)
+mesh.discretize(H)
+
+/*** Variables and constants definition ***/
+val gamma = Constant(Unitless)("gamma", 1.4 * Unitless)
+
+val rho = ProblemVariable(kg/m3)("density", mesh, (x, y, z) => {
+  if(x >= 0*m && x < 0.5*m) 0.445 * kg/m3
+  else 0.5 * kg/m3
+})
+rho.setNeumann(CFaceXMIN, 0 * (kg/m3)/m)
+rho.setNeumann(CFaceXMAX, 0 * (kg/m3)/m)
+
+val rho_u = ProblemVariable(kg/(m2*s))("momentum", mesh, (x, y, z) => {
+  if(x >= 0*m && x < 0.5*m) Vector(0.311 * kg/(m2*s))
+  else Vector(0 * kg/(m2*s))
+}, List[Rep[String]]("rho_ux"))
+rho_u.setNeumann(CFaceXMIN, Vector(0 * kg/(m3*s)))
+rho_u.setNeumann(CFaceXMAX, Vector(0 * kg/(m3*s)))
+
+val u = ProblemVariable(m/s)("velocity", mesh, (x, y, z) => {
+  if(x >= 0*m && x < 0.5*m) Vector((0.311/0.445) * m/s)
+  else Vector(0 * m/s)
+}, List[Rep[String]]("ux"))
+
+// p will be initialized using the equation of state
+val p = ProblemVariable(Pa)("pressure", mesh, 0 * Pa)
+
+val rhoE = ProblemVariable(kg/(m*s*s))("energy", mesh, (x, y, z) => {
+  if(x >= 0*m && x < 0.5*m) 8.928 * kg/(m*s*s)
+  else 1.4275 * kg/(m*s*s)
+})
+rhoE.setNeumann(CFaceXMIN, 0 * kg/(m2*s*s))
+rhoE.setNeumann(CFaceXMAX, 0 * kg/(m2*s*s))
+
+/*** Equation definition ***/
+/*** 1D Euler equations without external forces ***/
+val continuityEq = Equation(dt(rho), - rho * div(u) - u * grad(rho))
+val momentumEq = Equation(dt(rho_u), - rho_u.i * div(u) - u * grad(rho_u.i) - grad(p).i)
+val energyEq = Equation(dt(rhoE), - rhoE * div(u) - u * grad(rhoE) -  p * div(u) - u * grad(p))
+val pressureEq = Equation(p, (rhoE - (0.5*Unitless)*(u*rho_u)) * (gamma - 1.0*Unitless))
+val velocityEq = Equation(u, rho_u.i/rho)
+
+/*** Problem definition ***/
+// The pressureEq is an intialization equation. It will be solved once, before entering the time loop
+val eulerEqProb = Problem(mesh)(pressureEq)(continuityEq, momentumEq, energyEq, pressureEq, velocityEq)
+
+/*** Stepper definition ***/
+Stepper(eulerEqProb, Dt, nsteps, IntegrationMethod.RK4)("1DEulerEq_LaxTube_EULER", OutputFormat.VTK, SamplingMethod.Periodic, 1)
+
+
