@@ -1,0 +1,50 @@
+/******************* 2D Linear advection of a Gaussian Pulse ***************/
+/* Pure advection of a gaussian profile with constant advection velocity   */
+/***************************************************************************/
+
+/**
+ * 2D uniform, regular and periodic cartesian mesh.
+ * u = cst -> Saiph's generated code contains the "advec" operator
+ * which applies the method of lines, carrying no truncation error
+ * for a pure transport phenomena if and only if v*(dt/dx) = positive integer
+ * (cfl = positive integer)
+ *
+ * For u being a problem variable, the same result is obtained through the stabgrad
+ * operator (accuracy set to 1) if and only if cfl = 1.
+ *
+ * If cfl > 1, and running the application in parallel, a higher
+ * accuracy (than the default one, which is equal to 2) should be set, since
+ * in that case, the cfl indicates the number of neighbours needed to transport
+ * the profile.
+ * */
+
+/*** Simulation parameters ***/
+// Mesh size
+// Space discretization factor
+val H = 0.04*m
+// Time discretization factor
+val Dt = 0.04*s
+// Number of steps
+val nsteps = 300
+
+/*** Cartesian mesh definition ***/
+val mesh = CartesianMesh((-6*m, 6*m), (-3*m, 3*m))
+mesh.discretize(H, H)
+mesh.setPeriodic(DirX)
+mesh.setPeriodic(DirY)
+
+/*** Variables and constants definition ***/
+val phi = ProblemVariable(Unitless)("Phi", mesh, (x, y, z) => {
+  exp(-(pow(x, 2)/2.0 + pow(y, 2)/2.0)) * Unitless
+})
+
+val u = Constant(m/s)("velocity", Vector(1 * m/s, 0* m/s), List[Rep[String]]("X", "Y"))
+
+/*** Equation definition ***/
+val adveq = Equation(dt(phi), -u * grad(phi))
+
+/*** Problem definition ***/
+val probAdv = Problem(mesh)(adveq)
+
+/*** Stepper definition ***/
+Stepper(probAdv, Dt, nsteps, IntegrationMethod.Euler)("2DGaussianPulse", OutputFormat.VTK, SamplingMethod.Periodic, 1)

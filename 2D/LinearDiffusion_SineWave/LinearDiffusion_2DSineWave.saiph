@@ -1,0 +1,39 @@
+/******************* 2D Linear duffision of a Sine Wave *****************/
+/* Pure diffusion of a sine profile with constant diffusion coefficeint */
+/************************************************************************/
+/**
+ * 2D uniform, regular and periodic cartesian mesh.
+ * Constant diffusion coefficient.
+ * */
+
+/*** Simulation parameters ***/
+// Mesh size
+val LSIZE = 1*m
+// Space discretization factor
+val H = 0.0125*m
+// Time discretization factor
+val Dt = 0.02*s
+// Number of steps
+val nsteps = 500
+
+/*** Cartesian mesh definition ***/
+val mesh = CartesianMesh(LSIZE, LSIZE)
+mesh.discretize(H, H)
+mesh.setPeriodic(DirX)
+mesh.setPeriodic(DirY)
+
+/*** Variables and constants definition ***/
+val phi = ProblemVariable(Unitless)("Phi", mesh, (x, y, z) => {
+  sin(2.0*PI*x)*sin(2.0*PI*y)
+})
+
+val d = Constant(m2/s)("diffCoeff", 0.001*m2/s)
+
+/*** Equation definition ***/
+val diffeq = Equation(dt(phi), d * lapla(phi))
+
+/*** Problem definition ***/
+val probDiff = Problem(mesh)(diffeq)
+
+/*** Stepper definition ***/
+Stepper(probDiff, Dt, nsteps, IntegrationMethod.Euler)("2DSineWave", OutputFormat.VTK, SamplingMethod.Periodic, 1)
