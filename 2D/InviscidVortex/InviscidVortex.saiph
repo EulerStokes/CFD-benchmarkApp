@@ -1,0 +1,58 @@
+/************** 2D Isentropic vortex convection  *******************/
+/*******************************************************************/
+
+
+/** ==Overview==
+  * Governing equations: 2D Euler Equations
+  */
+
+// 2D uniform regular Cartesian mesh
+val mesh = CartesianMesh(10*m, 10*m)
+mesh.discretize(0.01953125*m, 0.01953125*m)
+mesh.setPeriodic(DirX)
+mesh.setPeriodic(DirY)
+
+// Constants, parameters and units
+val adiabaticIdx = 1.4
+val vortexStrenght = 0.5
+val v_x = Vector(1.0 * m/s, 0.0 * m/s)
+val v_y = Vector(0.0 * m/s, 1.0 * m/s)
+
+// Variables and constants. Defs and ICs
+val gamma_minus1 = Constant(Unitless)("AdiabaticIndex -1", (adiabaticIdx -1)*Unitless)
+
+val v = ProblemVariable(Speed)("Velocity", mesh, (x, y, z) => {
+  ((vortexStrenght / (2.0 * PI)) * exp(0.5 * (1.0-(pow((x.value - 5.0), 2) + pow((y.value - 5.0), 2)))) * (y.value - 5.0)) * v_x +
+  (1.0 - ((vortexStrenght / (2.0 * PI)) * exp(0.5 * (1.0 - (pow((x.value - 5.0), 2) + pow((y.value - 5.0), 2)))) * (x.value - 5.0))) * v_y
+}, List[Rep[String]]("X", "Y"))
+
+val p = ProblemVariable(Pressure)("Pressure", mesh, (x, y, z) => {
+  pow(pow(1 - (((adiabaticIdx -1.0) * vortexStrenght * vortexStrenght) / (8.0 * adiabaticIdx * PI * PI)) * exp(1.0 - (pow((x.value - 5.0), 2) + pow((y.value - 5.0), 2))), (1.0 / (adiabaticIdx - 1.0)))*Unitless, adiabaticIdx) * Pascals
+})
+
+val rho = ProblemVariable(kg/m3)("Density", mesh, 1.0*kg/m3)
+
+val rhoU = ProblemVariable(kg/m2/s)("Rho*U", mesh, Vector(0 * kg/m2/s, 0 * kg/m2/s), List[Rep[String]]("X", "Y"))
+
+val rhoE = ProblemVariable(kg/m/(s*s))("Rho*E", mesh, 0.0 * kg/m/(s*s))
+
+
+// Initialization equations
+val init_rhoe = Equation(rhoE, (p/(adiabaticIdx -1*Unitless)) + (0.5*Unitless) * rho * v * v)
+val init_rhou = Equation(rhoU, rho * v.i)
+
+// Euler Equations
+val density = Equation(dt(rho), -v * grad(rho) - rho * div(v))
+val momentum = Equation(dt(rhoU), -v * grad(rhoU.i) - rhoU.i * div(v) - grad(p).i)
+val energy = Equation(dt(rhoE), -v * grad(rhoE) - rhoE * div(v) - v * grad(p) - p * div(v))
+val velocity = Equation(v, rhoU.i/rho)
+val state = Equation(p, (adiabaticIdx -1*Unitless)*(rhoE - (0.5*Unitless)*rhoU*v))
+
+// Problem definition
+val prob = Problem(mesh)(init_rhoe, init_rhou)(density, momentum, energy, velocity, state)
+
+// Finally, we call to the solver
+def DELTA_TIME = 3.125 * ms
+def N_STEPS = 3200
+
+Stepper(prob, DELTA_TIME, N_STEPS, IntegrationMethod.RK3)("IsentropicVortex", OutputFormat.VTK, SamplingMethod.FinalState)
