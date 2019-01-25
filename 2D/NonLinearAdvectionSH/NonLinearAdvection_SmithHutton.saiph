@@ -1,0 +1,29 @@
+/** 2D Compressible App *************************************************/
+/*  This application solves the 2D Smith Hutton application which       */
+/*  corresponds to a convection problem                                 */
+/************************************************************************/
+
+val mesh = CartesianMesh((-1*m, 1*m), (0*m, 1*m))
+mesh.discretize(10*mm, 10*mm)
+
+// Defining and initializing problem variables and constants
+val alpha = 10.0 * Unitless
+val phi = ProblemVariable(Unitless)("Phi", mesh, (1*Unitless) - tanh(alpha))
+val u = Constant(m/s)("Velocity", mesh, (x, y, z) => {
+Vector((2*y*((1*m*m)-(pow(x, 2))))/(m*m*s), (-2*x*((1*m*m)- pow(y, 2)))/(m*m*s))}, List("Ux", "Uy"))
+val k = Constant(m*m/s)("Cte diff", 0.01*m*m/s)
+
+// Setting the desired BC
+phi.setDirichlet(CFaceXMIN)
+phi.setDirichlet(CFaceXMAX)
+phi.setDirichlet(CFaceYMAX)
+phi.setDirichlet((x, y, z) => {x < (0*m) && y == (0*m)}, (x, y, z) => {
+1*Unitless + tanh(alpha*((2*x)/m + (1*Unitless)))})
+phi.setNeumann(DirY, 1, (x, y, z) => {x >= 0*m && y == 0*m}, 0/m)
+
+// Governing equation
+val SMeq = Equation(dt(phi), -u*grad(phi) - phi*div(u))
+// Problem specification
+val SMprob = Problem(mesh)(SMeq)
+
+Stepper(SMprob, 0.001*s, 3000, IntegrationMethod.RK4)("SmithHutton_sim", OutputFormat.VTK, SamplingMethod.Periodic, 10)
