@@ -1,0 +1,80 @@
+/************** 2D Rising thermal bubble  *******************/
+/************************************************************/
+
+
+/** ==Overview==
+  * Governing equations: 2D EulerEquations.
+  * Atmospheric modelisation: conservative form using density,
+  * momentum and potential temperature.
+  */
+
+// 2D uniform regular Cartesian mesh
+val mesh = CartesianMesh(1000*m, 1000*m)
+mesh.discretize(20*m, 20*m)
+
+// Constants, parameters and units
+val s2 = s*s
+// Potential temperatures
+val potTempMean = 300 * K
+val potTempc = 0.5 * K
+// Bubble center
+val xc = 500 * m
+val yc = 350 * m
+val rc = 250 * m
+// Pressure reference (at zero altitude)
+val p0 = 100000* Pa
+// Specific heat capacities
+val cv = 717.645 * m2/(K*s2)
+val cp = 1004.703 * m2/(K*s2)
+// Gravity constant
+val g = 9.8 * m/s2
+// R constant of gases
+val R = 287.058 * m2/(K*s2)
+// y unity vector
+val jvec = Vector(0*Unitless, 1*Unitless)
+
+// Velocity
+val u = ProblemVariable(Speed)("Velocity", mesh, Vector(0.0*m/s, 0.0*m/s), List[Rep[String]]("X", "Y"))
+// Pressure
+val p = ProblemVariable(Pressure)("Pressure", mesh, 0.0 * Pascals)
+// Density
+val rho = ProblemVariable(kg/m3)("Density", mesh, 0.0 * kg/m3)
+// Momentum
+val rhoU = ProblemVariable(kg/m2/s)("Rho*U", mesh, Vector(0 * kg/m2/s, 0 * kg/m2/s), List[Rep[String]]("X", "Y"))
+rhoU(0).setDirichlet(CFaceXMIN, 0.0*kg/m2/s)
+rhoU(0).setDirichlet(CFaceXMAX, 0.0*kg/m2/s)
+rhoU(1).setDirichlet(CFaceYMIN, 0.0*kg/m2/s)
+rhoU(1).setDirichlet(CFaceYMAX, 0.0*kg/m2/s)
+// Potential temperature
+val theta = ProblemVariable(Temperature)("theta", mesh, (x, y, z) => {
+  val r = sqrt(pow((x-xc), 2)+pow((y-yc), 2))
+  if(r > rc) potTempMean
+  else potTempMean + 0.5 * potTempc * ( 1 + cos((PI*r)/rc))
+})
+
+val rhoTheta = ProblemVariable(kg*K/m3)("Rho*theta", mesh, 0.0 * kg*K/m3)
+
+// Exner pressure (hydrostatic balance)
+val pEx = ProblemVariable(Unitless)("Exner pressure", mesh, (x, y, z) => {
+  1 - (g*y)/(cp*potTempMean)
+})
+
+// Initialization equations
+val init_rho = Equation(rho, (p0/(R*theta))*pow(pEx, cv/R))
+val init_rhoTheta = Equation(rhoTheta, rho*theta)
+
+// Euler Equations
+val density = Equation(dt(rho), -u * grad(rho) - rho * div(u))
+val momentum = Equation(dt(rhoU), -u * grad(rhoU.i) - rhoU.i * div(u) - grad(p).i - rho*g*jvec.i)
+val tempe = Equation(dt(rhoTheta), -u * grad(rhoTheta) - rhoTheta * div(u))
+val velocity = Equation(u, rhoU.i/rho)
+val state = Equation(p, p0*pow((rhoTheta*R)/p0, cp/cv))
+
+// Problem definition
+val prob = Problem(mesh)(init_rho, init_rhoTheta, state)(density, momentum, tempe, velocity, state)
+
+// Finally, we call to the solver
+def DELTA_TIME = 5 * ms
+def N_STEPS = 140000
+
+Stepper(prob, DELTA_TIME, N_STEPS, IntegrationMethod.RK3)("RisingBubble", OutputFormat.VTK, SamplingMethod.Periodic, 5000)
