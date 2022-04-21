@@ -9,7 +9,7 @@
 
 // 3D uniform regular Cartesian mesh
 val piL = 0.016 * m
-val L = piL/PI * m
+val L = piL/PI
 val mesh = CartesianMesh((-piL, piL), (-piL, piL), (-piL, piL))
 mesh.discretize(0.625E-4*m, 0.625E-4*m, 0.625E-4*m)
 mesh.setPeriodic(DirX)
