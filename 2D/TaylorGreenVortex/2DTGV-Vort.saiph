@@ -42,18 +42,24 @@ val u = ProblemVariable(Speed)("Velocity", mesh, (x, y, z) => {
   val uy_init = -U0*cos(x/L)*sin(y/L)
   Vector(ux_init, uy_init)
 }, List[Rep[String]]("X", "Y"))
+u.notOut()
 // Temperature
 val T = ProblemVariable(Temperature)("Temperature", mesh, T0)
+T.notOut()
 // Density
 val rho = ProblemVariable(kg/m3)("Density", mesh, 0.0 * kg/m3)
+rho.notOut()
 // Pressure
 val p = ProblemVariable(Pressure)("Pressure", mesh, (x, y, z) => {
   p_init = p0 + ((3*rho0*U0*U0)/16)*(cos(2*x/L)+cos(2*y/L))
 })
+p.notOut()
 // Momentum
-val rhoU = Problemvariable(kg/m2/s)("rho*u", mesh, vector(0 * kg/m2/s, 0 * kg/m2/s), list[rep[string]]("x", "y"))
+val rhoU = Problemvariable(kg/m2/s)("rho*u", mesh, vector(0 * kg/m2/s, 0 * kg/m2/s), list[rep[string]]("X", "Y"))
+rhoU.notOut()
 // Energy
 val rhoE = Problemvariable(kg/m/s2)("rho*E", mesh, 0 * kg/m/s2)
+rhoE.notOut()
 // Vorticity
 val vort = ProblemVariable(Unitless/s)("vorticity", mesh, (x, y, z) => {
   vort_init = 2.0*U0/L*sin(x/L)*sin(y/L))

@@ -1,0 +1,106 @@
+/************** 3D Taylor-Green Vortex **********************/
+/************************************************************/
+
+
+/** ==Overview==
+  * Governing equations: 3D incompressible Navier-Stokes.
+  * Unsteady flow of a decaying vortex.
+  */
+
+// 3D uniform regular Cartesian mesh
+val piL = 0.016 * m
+val L = piL/PI * m
+val mesh = CartesianMesh((-piL, piL), (-piL, piL), (-piL, piL))
+mesh.discretize(0.625E-4*m, 0.625E-4*m, 0.625E-4*m)
+mesh.setPeriodic(DirX)
+mesh.setPeriodic(DirY)
+mesh.setPeriodic(DirZ)
+
+// Constants, parameters and units
+val m3 = m*m*m
+// Initial flow parameters
+val U0 = 33.7 * m/s
+val T0 = 273.0 * K
+val rho0 = 0.15568 * kg/m3
+val p0 = 12622.80 * Pa
+// R constant of gases
+val R = 297.0 * J/(kg*K)
+// Specific heat capacities
+val cv = 743.0 * J/(kg*K)
+val cp = 1040.0 * J/(kg*K)
+// Specific heat ratio
+val gamma = 1.4 * Unitless
+// Dynamics shear viscosity
+val mu0 = 1.67E-5 * kg/(m*s)
+// Prandtl number
+val Pr = 0.71 * Unitless
+
+// Problem Variables
+// Velocity
+val u = ProblemVariable(Speed)("Velocity", mesh, (x, y, z) => {
+  val ux_init = U0*sin(x/L)*cos(y/L)
+  val uy_init = -U0*cos(x/L)*sin(y/L)
+  val uz_init = 0*m/s
+  Vector(ux_init, uy_init, uz_init)
+}, List[Rep[String]]("X", "Y", "Z"))
+u.notOut()
+// Temperature
+val T = ProblemVariable(Temperature)("Temperature", mesh, T0)
+T.notOut()
+// Density
+val rho = ProblemVariable(kg/m3)("Density", mesh, 0.0 * kg/m3)
+rho.notOut()
+// Pressure
+val p = ProblemVariable(Pressure)("Pressure", mesh, (x, y, z) => {
+  p_init = p0 + ((rho0*U0*U0)/16)*(cos(2*x/L)+cos(2*y/L))*(cos(2*z/L) + 2)
+})
+p.notOut()
+// Momentum
+val rhoU = Problemvariable(kg/m2/s)("rho*u", mesh, vector(0 * kg/m2/s, 0 * kg/m2/s, 0 * kg/m2/s), list[rep[string]]("X", "Y", "Z"))
+rhoU.notOut()
+// Energy
+val rhoE = Problemvariable(kg/m/s2)("rho*E", mesh, 0 * kg/m/s2)
+rhoE.notOut()
+// Vorticity
+val vortX = ProblemVariable(Unitless/s)("vorticityX", mesh, 0 * Unitless/s)
+vortX.notOut()
+val vortY = ProblemVariable(Unitless/s)("vorticityY", mesh, 0 * Unitless/s)
+vortY.notOut()
+val vortZ = ProblemVariable(Unitless/s)("vorticityZ", mesh, 0 * Unitless/s)
+// Kinetic energy
+val ek = ProblemVariable(Unitless/m3)("KineticEnergy", mesh, 0 * Unitless/m3)
+ek.notOut()
+ek.integrate()
+// Enstrophy
+val enstr = ProblemVariable(Unitless/m3)("Enstrophy", mesh, 0 * Unitless/m3)
+enstr.notOut()
+enstr.integrate()
+
+// Init equations
+val initRho = Equation(rho, p/(R*T0))
+val initRhoU = Equation(rhoU, rho*u.comp)
+val initRhoE = Equation(rhoE, rho*((cv*T)+(0.5*u*u)))
+
+// Governing Equations
+val continuity = Equation(dt(rho), -convDiv(u,rho))
+val momentum = Equation(dt(rhoU), -convDiv(u, rhoU.comp, p) + mu*lapla(u.comp))
+val energy = Equation(dt(rhoE), -convDiv(u, rhoE+p) + mu*(u(0)*lapla(u(0)) + u(1)*lapla(u(1)))) + mu*cp/Pr*lapla(T))
+val velocity = Equation(u, rhoU.comp/rho)
+val temperature = Equation(T, (1/cv)*(rhoE/rho - 0.5*u*u))
+val state = Equation(p, rho*R*T)
+
+// Validation Equations (only computed for output time-steps)
+val vortXEq = Equation(vortX, der(1, u(2)) - der(2, u(1)))
+val vortYEq = Equation(vortY, der(2, u(0)) - der(0, u(2)))
+val vortZEq = Equation(vortZ, der(0, u(1)) - der(1, u(0)))
+val ekineticEq = Equation(ek, (1/(2*rho0*U0*U0*pow(2*piL, 3))) * rho * u*u)
+val enstrEq = Equation(enstr, ((L*L)/(2*rho0*U0*U0*pow(2*piL, 3))) * rho * (vortX*vortX + vortY*vortY + vortZ*vortZ))
+
+// Problem definition
+val prob = Problem(mesh)(initRho, initRhoU, initRhoE, vortXEq, vortYEq, vortZEq, ekineticEq, enstrEq)(continuity, momentum, energy, velocity, temperature, state)(vortXEq, vortYEq, vortZEq, ekineticEq, enstrEq)
+
+// Finally, we call to the solver
+def DELTA_TIME = 0.375E-7 * s
+def N_STEPS = 80000
+
+Stepper(prob, DELTA_TIME, N_STEPS, IntegrationMethod.RK3)("3DTGV", OutputFormat.VTK, SamplingMethod.Periodic, 400)
