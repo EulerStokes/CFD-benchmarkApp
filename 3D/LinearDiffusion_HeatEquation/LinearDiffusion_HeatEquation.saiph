@@ -1,0 +1,37 @@
+/******************* 3D Linear diffusion - Heat Equation ****************/
+/* Pure diffusion of an spherical profile with constant diffusion coeff */
+/************************************************************************/
+/**
+ * 3D uniform, regular cartesian mesh with fixed boundary contidions.
+ * */
+
+/*** Simulation parameters ***/
+// Mesh size
+val XSIZE = 3*m
+val YSIZE = 3*m
+val ZSIZE = 3*m
+// Space discretization factor
+val H = 0.01*m
+// Time discretization factor
+val Dt = 0.01*ms
+// Number of steps
+val nsteps = 25000
+
+/*** Cartesian mesh definition ***/
+val mesh = CartesianMesh(XSIZE, YSIZE, ZSIZE)
+mesh.discretize(H, H, H)
+
+/*** Variables and constants definition ***/
+val kappa = Constant(m2/s)("Diff coeff", 1.0 * m2/s)
+val T = ProblemVariable(Temperature)("T", mesh, (x, y, z) => {
+  400*exp(-(pow((x-1.5), 2)+pow((y-1.5), 2)+pow((z-1.5), 2))) * K
+})
+
+/*** Equation definition ***/
+val heatEq = Equation(dt(T), kappa * lapla(T))
+
+/*** Problem definition ***/
+val probHeatDiff = Problem(mesh)(heatEq)
+
+/*** Stepper definition ***/
+Stepper(probHeatDiff, Dt, nsteps, IntegrationMethod.Euler)("3DHeatDiff", OutputFormat.Binary, SamplingMethod.Periodic, 500)
