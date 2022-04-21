@@ -1,4 +1,3 @@
-
 /******************* 1D Linear advection of a Sine Wave ********************/
 /* Pure advection of a sinusoidal profile with constant advection velocity */
 /***************************************************************************/
