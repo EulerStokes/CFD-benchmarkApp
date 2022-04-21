@@ -84,8 +84,9 @@ val eqVort = Equation(vort, der(0, u(1)) - der(1, u(0)))
 // Problem definition
 val prob = Problem(mesh)(initRho, initRhoU, initRhoE)(continuity, momentum, energy, velocity, temperature, state)(eqVort)
 
-// Finally, we call to the solver
+// Time parameters
 def DELTA_TIME = 7.6E-8 * s
 def N_STEPS = 1000000
 
+// Solver
 Stepper(prob, DELTA_TIME, N_STEPS, IntegrationMethod.RK3)("2DTGV", OutputFormat.VTK, SamplingMethod.Periodic, 2000)
