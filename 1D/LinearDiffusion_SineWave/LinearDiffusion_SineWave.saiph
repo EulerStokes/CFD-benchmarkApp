@@ -1,0 +1,38 @@
+/******************* 1D Linear diffusion of a Sine Wave *****************/
+/* Pure diffusion of a sinusoidal profile with constant diffusion coeff */
+/************************************************************************/
+/**
+ * 1D uniform, regular and periodic cartesian mesh.
+ * nu = cst -> Saiph's generated code contains a laplacian operation
+ * nu*lapla(phi) instead of div(nu(grad(phi)) --> computation optimisation
+ * */
+
+/*** Simulation parameters ***/
+// Mesh size
+val XSIZE = 1*m
+// Space discretization factor
+val H = 12.5*mm
+// Time discretization factor
+val Dt = 50*ms
+// Number of steps
+val nsteps = 200
+
+/*** Cartesian mesh definition ***/
+val mesh = CartesianMesh(XSIZE)
+mesh.discretize(H)
+mesh.setPeriodic(DirX)
+
+/*** Variables and constants definition ***/
+val nu = Constant(m2/s)("Diff coeff", 0.001 * m2/s)
+val phi = ProblemVariable(Unitless)("Phi", mesh, (x, y, z) => {
+  sin(2.0*PI*x)
+})
+
+/*** Equation definition ***/
+val diffeq = Equation(dt(phi), div(nu * grad(phi)))
+
+/*** Problem definition ***/
+val probDiff = Problem(mesh)(diffeq)
+
+/*** Stepper definition ***/
+Stepper(probDiff, Dt, nsteps, IntegrationMethod.RK3)("1DSineWave", OutputFormat.Binary, SamplingMethod.Periodic, 5)
